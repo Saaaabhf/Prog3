@@ -1,16 +1,16 @@
 import sqlite3
 import datetime
 
-# Назва файлу нашої бази даних
+# назва файлу нашої бази даних
 DB_NAME = 'security_events.db'
 
 
 def create_connection():
-    """Підключаємось до SQLite і повертаємо об'єкт з'єднання."""
+    """ підключаємось до SQLite і повертаємо об'єкт з'єднання """
     conn = None
     try:
         conn = sqlite3.connect(DB_NAME)
-        # Дуже важливо для цілісності даних: вмикаємо зовнішні ключі.
+        # дуже важливо для цілісності даних: вмикаємо зовнішні ключі
         conn.execute("PRAGMA foreign_keys = ON")
     except sqlite3.Error as e:
         print(f"Ой, не вдалося підключитися до бази: {e}")
@@ -18,7 +18,7 @@ def create_connection():
 
 
 def create_tables():
-    """Створюємо таблички, якщо їх ще немає в базі."""
+    """ створюємо таблички, якщо їх ще немає в базі """
     conn = create_connection()
     if not conn:
         print("Немає з'єднання, таблиці не створено.")
@@ -26,7 +26,7 @@ def create_tables():
 
     cursor = conn.cursor()
     try:
-        # Таблиця для джерел подій (звідки приходять логи)
+        # таблиця для джерел подій звідки приходять логи
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS EventSources (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +36,7 @@ def create_tables():
             );
         """)
 
-        # Типи подій та їх серйозність
+        # типи подій та їх серйозність
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS EventTypes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,7 +45,7 @@ def create_tables():
             );
         """)
 
-        # Основна таблиця, де зберігатимуться всі події безпеки
+        # основна таблиця, де зберігатимуться всі події безпеки
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS SecurityEvents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,8 +53,8 @@ def create_tables():
                 source_id INTEGER,
                 event_type_id INTEGER,
                 message TEXT,
-                ip_address TEXT, -- Може бути порожнім
-                username TEXT,   -- Теж може бути порожнім
+                ip_address TEXT, -- може бути порожнім
+                username TEXT,   -- теж може бути порожнім
                 FOREIGN KEY (source_id) REFERENCES EventSources(id),
                 FOREIGN KEY (event_type_id) REFERENCES EventTypes(id)
             );
@@ -64,17 +64,18 @@ def create_tables():
     except sqlite3.Error as e:
         print(f"Щось пішло не так при створенні таблиць: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 def populate_initial_event_types():
-    """Заповнюємо EventTypes початковим набором даних, щоб було з чим працювати."""
+    """ заповнюємо EventTypes початковим набором даних, щоб було з чим працювати """
     conn = create_connection()
     if not conn:
         return
 
     cursor = conn.cursor()
-    # Стандартні типи подій, які ми очікуємо бачити
+    # стандартні типи подій, які ми очікуємо бачити
     event_types_data = [
         ("Login Success", "Informational"),
         ("Login Failed", "Warning"),
@@ -83,7 +84,7 @@ def populate_initial_event_types():
     ]
 
     try:
-        # INSERT OR IGNORE - щоб не було помилок, якщо запускаємо повторно
+        # insert or ignore щоб не було помилок, якщо запускаємо повторно
         cursor.executemany("INSERT OR IGNORE INTO EventTypes (type_name, severity) VALUES (?, ?)", event_types_data)
         conn.commit()
         if cursor.rowcount > 0:
@@ -93,11 +94,12 @@ def populate_initial_event_types():
     except sqlite3.Error as e:
         print(f"Помилка при додаванні початкових типів подій: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 def register_event_source(name, location, type_val):
-    """Додаємо нове джерело подій (наприклад, новий сервер або фаєрвол)."""
+    """ додаємо нове джерело подій наприклад новий сервер або фаєрвол """
     conn = create_connection()
     if not conn:
         return None
@@ -110,20 +112,22 @@ def register_event_source(name, location, type_val):
         source_id = cursor.lastrowid
         print(f"Джерело '{name}' зареєстровано, ID: {source_id}.")
         return source_id
-    except sqlite3.IntegrityError:  # Це якщо ім'я вже зайняте
+    except sqlite3.IntegrityError:  # це якщо ім'я вже зайняте
         print(f"Джерело '{name}' вже існує. Не додано.")
         cursor.execute("SELECT id FROM EventSources WHERE name = ?", (name,))
-        existing_id = cursor.fetchone()
-        return existing_id[0] if existing_id else None  # Повернемо ID існуючого, якщо знайшли
+        existing_id_tuple = cursor.fetchone()
+        # повернемо ID існуючого, якщо знайшли
+        return existing_id_tuple[0] if existing_id_tuple else None
     except sqlite3.Error as e:
         print(f"Не вдалося зареєструвати джерело '{name}': {e}")
         return None
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 def register_event_type(type_name, severity):
-    """Додаємо новий тип події, якщо такого ще немає."""
+    """ додаємо новий тип події, якщо такого ще немає """
     conn = create_connection()
     if not conn:
         return None
@@ -139,17 +143,18 @@ def register_event_type(type_name, severity):
     except sqlite3.IntegrityError:
         print(f"Тип події '{type_name}' вже існує. Не додано.")
         cursor.execute("SELECT id FROM EventTypes WHERE type_name = ?", (type_name,))
-        existing_id = cursor.fetchone()
-        return existing_id[0] if existing_id else None
+        existing_id_tuple = cursor.fetchone()
+        return existing_id_tuple[0] if existing_id_tuple else None
     except sqlite3.Error as e:
         print(f"Не вдалося зареєструвати тип події '{type_name}': {e}")
         return None
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 def log_security_event(source_id, event_type_id, message, ip_address=None, username=None):
-    """Записуємо саму подію безпеки в базу. Час фіксується автоматично."""
+    """ записуємо саму подію безпеки в базу. Час фіксується автоматично """
     conn = create_connection()
     if not conn:
         return None
@@ -163,25 +168,26 @@ def log_security_event(source_id, event_type_id, message, ip_address=None, usern
         """, (timestamp, source_id, event_type_id, message, ip_address, username))
         conn.commit()
         event_id = cursor.lastrowid
-        # print(f"Подія безпеки (ID: {event_id}) записана.") # Можна прибрати, щоб не було забагато виводу
+        # print(f"Подія безпеки ID: {event_id} записана.") # можна прибрати, щоб не було забагато виводу
         return event_id
     except sqlite3.Error as e:
         print(f"Помилка при записі події безпеки: {e}")
         return None
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
-# --- Далі йдуть функції для всяких запитів до бази ---
+# --- далі йдуть функції для всяких запитів до бази ---
 
 def get_failed_logins_last_24_hours():
-    """Шукаємо всі невдалі спроби входу за останню добу."""
+    """ шукаємо всі невдалі спроби входу за останню добу """
     conn = create_connection()
     if not conn:
         return []
     cursor = conn.cursor()
     try:
-        # Віднімаємо 24 години від поточного часу
+        # віднімаємо 24 години від поточного часу
         twenty_four_hours_ago = (datetime.datetime.now() - datetime.timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
             SELECT se.timestamp, es.name as source_name, se.ip_address, se.username, se.message
@@ -196,19 +202,20 @@ def get_failed_logins_last_24_hours():
         print(f"Помилка при отриманні невдалих логінів: {e}")
         return []
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 def detect_potential_bruteforce_ips():
-    """Спроба виявити IP, з яких хтось активно підбирає паролі (більше 5 невдалих спроб за годину)."""
+    """ спроба виявити IP, з яких хтось активно підбирає паролі, більше 5 невдалих спроб за годину """
     conn = create_connection()
     if not conn:
         return []
     cursor = conn.cursor()
     try:
         one_hour_ago = (datetime.datetime.now() - datetime.timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
-        # Шукаємо тип події "Login Failed"
-        # Потім групуємо по IP і рахуємо кількість таких подій за останню годину
+        # шукаємо тип події Login Failed
+        # потім групуємо по IP і рахуємо кількість таких подій за останню годину
         cursor.execute("""
             SELECT ip_address, COUNT(id) as failed_attempts, MIN(timestamp) as first_attempt, MAX(timestamp) as last_attempt
             FROM SecurityEvents
@@ -224,11 +231,12 @@ def detect_potential_bruteforce_ips():
         print(f"Помилка при детектуванні брутфорсу: {e}")
         return []
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
-def get_critical_events_last_week_by_source():
-    """Витягуємо всі критичні події за останній тиждень, згруповані за джерелом."""
+def get_aggregated_critical_events_by_source():
+    """ витягуємо статистику по критичним подіям за останній тиждень, згруповану по джерелах """
     conn = create_connection()
     if not conn:
         return []
@@ -236,30 +244,34 @@ def get_critical_events_last_week_by_source():
     try:
         one_week_ago = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
-            SELECT es.name as source_name, es.location, es.type as source_type,
-                   se.timestamp, se.message, se.ip_address, se.username
+            SELECT es.name as source_name, 
+                   COUNT(se.id) as event_count,
+                   es.location, 
+                   es.type as source_type 
             FROM SecurityEvents se
             JOIN EventTypes et ON se.event_type_id = et.id
             JOIN EventSources es ON se.source_id = es.id
             WHERE et.severity = 'Critical' AND se.timestamp >= ?
-            ORDER BY es.name, se.timestamp DESC;
+            GROUP BY es.name, es.location, es.type
+            ORDER BY event_count DESC, es.name;
         """, (one_week_ago,))
         return cursor.fetchall()
     except sqlite3.Error as e:
-        print(f"Помилка при отриманні критичних подій: {e}")
+        print(f"Помилка при отриманні агрегованих критичних подій: {e}")
         return []
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 def find_events_by_keyword(keyword):
-    """Простий пошук подій, де в повідомленні є задане ключове слово."""
+    """ простий пошук подій, де в повідомленні є задане ключове слово """
     conn = create_connection()
     if not conn:
         return []
     cursor = conn.cursor()
     try:
-        # LIKE '%слово%' - шукає входження слова будь-де в тексті
+        # like '%слово%' шукає входження слова будь-де в тексті
         cursor.execute(f"""
             SELECT se.timestamp, es.name as source_name, et.type_name as event_type,
                    se.message, se.ip_address, se.username
@@ -268,17 +280,18 @@ def find_events_by_keyword(keyword):
             JOIN EventSources es ON se.source_id = es.id
             WHERE se.message LIKE ?
             ORDER BY se.timestamp DESC;
-        """, (f'%{keyword}%',))  # Зверніть увагу на синтаксис параметра LIKE
+        """, (f'%{keyword}%',))  # зверніть увагу на синтаксис параметра LIKE
         return cursor.fetchall()
     except sqlite3.Error as e:
         print(f"Помилка при пошуку за ключовим словом '{keyword}': {e}")
         return []
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 def add_sample_data():
-    """Додамо трохи даних для тестів, щоб база не була порожньою."""
+    """ додамо трохи даних для тестів, щоб база не була порожньою """
     print("\n--- Заповнення тестовими даними ---")
 
     src1_id = register_event_source("Firewall_Corp_HQ", "192.168.1.1", "Firewall")
@@ -290,9 +303,9 @@ def add_sample_data():
     login_f_id = get_event_type_id("Login Failed")
     scan_id = get_event_type_id("Port Scan Detected")
     malware_id = get_event_type_id("Malware Alert")
-    logout_id = register_event_type("User Logout", "Informational")  # Додамо свій тип
+    logout_id = register_event_type("User Logout", "Informational")  # додамо свій тип
 
-    if not all([src1_id, src2_id, src3_id, login_s_id, login_f_id, scan_id, malware_id, logout_id]):
+    if not all([src1_id, src2_id, src3_id, src4_id, login_s_id, login_f_id, scan_id, malware_id, logout_id]):
         print("Проблема з отриманням ID для тестових даних. Пропускаємо.")
         return
 
@@ -300,33 +313,33 @@ def add_sample_data():
     log_security_event(src1_id, login_f_id, "Невдалий логін admin", "101.102.103.104", "admin")
     log_security_event(src1_id, login_f_id, "Невдалий логін root", "101.102.103.104", "root")
 
-    # Імітуємо атаку перебору паролів
+    # імітуємо атаку перебору паролів
     for i in range(6):
         log_security_event(src2_id, login_f_id, f"Невдала спроба для testuser{i + 1}", "203.0.113.45",
                            f"testuser{i + 1}")
 
     log_security_event(src2_id, login_s_id, "Успішний вхід john.doe", "192.168.1.50", "john.doe")
     log_security_event(src3_id, scan_id, "Сканування портів з 45.55.65.75", "45.55.65.75")
-    log_security_event(src1_id, malware_id, "Знайдено вірус 'Trojan.Generic' на 192.168.1.200!", "192.168.1.200",
+    log_security_event(src1_id, malware_id, "Знайдено вірус Trojan.Generic на 192.168.1.200!", "192.168.1.200",
                        "system")
     log_security_event(src2_id, login_f_id, "Неправильний API ключ", "10.0.0.88")
     log_security_event(src4_id, logout_id, "jane.doe вийшла з системи.", "192.168.1.100", "jane.doe")
     log_security_event(src1_id, login_s_id, "VPN для guest_user", "99.88.77.66", "guest_user")
-    log_security_event(src3_id, malware_id, "КРИТИЧНО: Шифрувальник 'Locky' в атачменті у hr_dept", "172.16.0.20",
+    log_security_event(src3_id, malware_id, "КРИТИЧНО: Шифрувальник Locky в атачменті у hr_dept", "172.16.0.20",
                        "hr_dept")
 
-    # Додамо пару "старих" подій, щоб перевірити фільтри по часу
+    # додамо пару старих подій, щоб перевірити фільтри по часу
     conn_temp = create_connection()
     if conn_temp:
         cursor_temp = conn_temp.cursor()
         two_days_ago = (datetime.datetime.now() - datetime.timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S")
         ten_days_ago = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S")
         try:
-            if login_f_id:  # Перевірка, чи ID дійсний
+            if login_f_id and src1_id:  # перевірка чи ID дійсний
                 cursor_temp.execute(
                     "INSERT INTO SecurityEvents (timestamp, source_id, event_type_id, message, ip_address, username) VALUES (?, ?, ?, ?, ?, ?)",
                     (two_days_ago, src1_id, login_f_id, "Дуже старий невдалий логін", "1.2.3.4", "old_user"))
-            if malware_id:  # Перевірка, чи ID дійсний
+            if malware_id and src3_id:
                 cursor_temp.execute(
                     "INSERT INTO SecurityEvents (timestamp, source_id, event_type_id, message, ip_address, username) VALUES (?, ?, ?, ?, ?, ?)",
                     (ten_days_ago, src3_id, malware_id, "Архівний вірус знайдено", "10.10.10.10", "archivist"))
@@ -335,12 +348,13 @@ def add_sample_data():
         except sqlite3.Error as e:
             print(f"Помилка при додаванні старих тестових подій: {e}")
         finally:
-            conn_temp.close()
+            if conn_temp:
+                conn_temp.close()
     print("Тестові дані додано.")
 
 
 def get_event_type_id(type_name):
-    """Маленька функція-помічник, щоб отримати ID типу події за його назвою."""
+    """ маленька функція-помічник, щоб отримати ID типу події за його назвою """
     conn = create_connection()
     if not conn: return None
     cursor = conn.cursor()
@@ -352,24 +366,33 @@ def get_event_type_id(type_name):
         print(f"Не вдалося знайти ID для типу '{type_name}': {e}")
         return None
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 def main():
-    """Головна функція, яка все запускає."""
+    """ головна функція, яка все запускає """
     print("Система логування подій безпеки вітає вас!")
 
     create_tables()
     populate_initial_event_types()
 
-    # Перевіримо, чи є вже джерела. Якщо немає, додамо тестові дані.
-    # Це щоб не заповнювати базу однаковими даними кожен раз.
+    # перевіримо, чи є вже джерела. якщо немає, додамо тестові дані
+    # це щоб не заповнювати базу однаковими даними кожен раз
     conn_check = create_connection()
     if conn_check:
+        source_count = 0
         cursor_check = conn_check.cursor()
-        cursor_check.execute("SELECT COUNT(id) FROM EventSources")
-        source_count = cursor_check.fetchone()[0]
-        conn_check.close()
+        try:
+            cursor_check.execute("SELECT COUNT(id) FROM EventSources")
+            source_count_tuple = cursor_check.fetchone()
+            if source_count_tuple:
+                source_count = source_count_tuple[0]
+        except sqlite3.Error as e:
+            print(f"Помилка при перевірці кількості джерел: {e}")
+        finally:
+            conn_check.close()
+
         if source_count == 0:
             print("Схоже, база порожня. Додамо трохи тестових даних.")
             add_sample_data()
@@ -378,7 +401,7 @@ def main():
 
     print("\n--- Демонстрація роботи з запитами ---")
 
-    print("\n1. Шукаємо IP, з яких часто невдало логіняться (можливий брутфорс):")
+    print("\n1. Шукаємо IP, з яких часто невдало логіняться можливий брутфорс:")
     potential_bruteforce = detect_potential_bruteforce_ips()
     if potential_bruteforce:
         for ip, count, first, last in potential_bruteforce:
@@ -395,33 +418,29 @@ def main():
     else:
         print("  За останню добу невдалих логінів не було.")
 
-    print("\n3. Критичні події за останній тиждень (по джерелах):")
-    critical_events = get_critical_events_last_week_by_source()
-    if critical_events:
-        current_source = None
-        for src_name, loc, src_type, ts, msg, ip, user in critical_events:
-            if src_name != current_source:
-                print(f"\n  Джерело: {src_name} (тип: {src_type}, місце: {loc or 'N/A'})")
-                current_source = src_name
-            print(f"    - {ts} | IP: {ip or 'N/A'} | Користувач: {user or 'N/A'} | Повідомлення: {msg}")
+    print("\n3. Критичні події за останній тиждень згруповані по джерелах:")
+    critical_events_stats = get_aggregated_critical_events_by_source()
+    if critical_events_stats:
+        for src_name, count, loc, src_type in critical_events_stats:
+            print(f"  Джерело: {src_name} (тип: {src_type}, місце: {loc or 'N/A'}) - Кількість критичних подій: {count}")
     else:
         print("  Критичних подій за тиждень немає. Все спокійно!")
 
-    print("\n4. Шукаємо події, де згадується 'malware':")
-    keyword_events = find_events_by_keyword("malware")  #
-    if keyword_events:
-        for ts, src, ev_type, msg, ip, user in keyword_events:
+    print("\n4. Шукаємо події, де згадується malware:")
+    keyword_events_malware = find_events_by_keyword("malware")
+    if keyword_events_malware:
+        for ts, src, ev_type, msg, ip, user in keyword_events_malware:
             print(f"  - {ts} | {src} ({ev_type}) | IP: {ip or 'N/A'} | Користувач: {user or 'N/A'} | {msg}")
     else:
-        print("  Слова 'malware' в логах не знайдено.")
+        print("  Слова malware в логах не знайдено.")
 
-    print("\n5. Шукаємо події, де згадується 'admin':")
-    keyword_events_admin = find_events_by_keyword("admin")  #
+    print("\n5. Шукаємо події, де згадується admin:")
+    keyword_events_admin = find_events_by_keyword("admin")
     if keyword_events_admin:
         for ts, src, ev_type, msg, ip, user in keyword_events_admin:
             print(f"  - {ts} | {src} ({ev_type}) | IP: {ip or 'N/A'} | Користувач: {user or 'N/A'} | {msg}")
     else:
-        print("  Слова 'admin' в логах не знайдено.")
+        print("  Слова admin в логах не знайдено.")
 
     print("\n--- Спробуємо додати щось нове ---")
     new_src_id = register_event_source("Test_Router_X1", "192.168.0.254", "Router")
