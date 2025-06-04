@@ -10,7 +10,7 @@ def create_connection():
     conn = None
     try:
         conn = sqlite3.connect(DB_NAME)
-        # дуже важливо для цілісності даних. вмикаємо зовнішні ключі
+        # дуже важиво для цілісності даних. вмикаємо зовнішні ключі
         conn.execute("PRAGMA foreign_keys = ON")
     except sqlite3.Error as e:
         print(f"Ой, не вдалося підключитися до бази: {e}")
