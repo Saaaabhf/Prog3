@@ -271,7 +271,7 @@ def find_events_by_keyword(keyword):
         return []
     cursor = conn.cursor()
     try:
-        # like '%слово%' шукає входження слова будь-де в тексті
+        # like '%слово%' шукає входження слова будь де в тексті
         cursor.execute(f"""
             SELECT se.timestamp, es.name as source_name, et.type_name as event_type,
                    se.message, se.ip_address, se.username
@@ -280,7 +280,7 @@ def find_events_by_keyword(keyword):
             JOIN EventSources es ON se.source_id = es.id
             WHERE se.message LIKE ?
             ORDER BY se.timestamp DESC;
-        """, (f'%{keyword}%',))  # зверніть увагу на синтаксис параметра LIKE
+        """, (f'%{keyword}%',))
         return cursor.fetchall()
     except sqlite3.Error as e:
         print(f"Помилка при пошуку за ключовим словом '{keyword}': {e}")
@@ -303,7 +303,7 @@ def add_sample_data():
     login_f_id = get_event_type_id("Login Failed")
     scan_id = get_event_type_id("Port Scan Detected")
     malware_id = get_event_type_id("Malware Alert")
-    logout_id = register_event_type("User Logout", "Informational")  # додамо свій тип
+    logout_id = register_event_type("User Logout", "Informational")
 
     if not all([src1_id, src2_id, src3_id, src4_id, login_s_id, login_f_id, scan_id, malware_id, logout_id]):
         print("Проблема з отриманням ID для тестових даних. Пропускаємо.")
